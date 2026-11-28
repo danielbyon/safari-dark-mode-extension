@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Safari Capabilities MV3",
+  "version": "0.1.0",
+  "description": "Measure Safari extension behavior on controlled fixture sites.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "webNavigation",
+    "alarms",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://127.0.0.1/*",
+        "http://localhost/*"
+      ],
+      "all_frames": true,
+      "run_at": "document_start",
+      "js": [
+        "content.js"
+      ]
+    }
+  ],
+  "commands": {
+    "toggle-tab": {
+      "suggested_key": {
+        "mac": "Alt+Shift+T"
+      },
+      "description": "Toggle appearance in this tab"
+    },
+    "toggle-pause": {
+      "suggested_key": {
+        "mac": "Alt+Shift+P"
+      },
+      "description": "Pause or resume fixture rendering"
+    }
+  },
+  "action": {
+    "default_title": "Safari capabilities",
+    "default_popup": "popup.html"
+  }
+}

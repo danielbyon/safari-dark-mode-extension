@@ -1,0 +1,94 @@
+{
+  "environment": "Local unsigned builds, macOS and generic iOS Simulator. Shipping Safari NOT_RUN.",
+  "origin_configuration": "fixture defaults",
+  "node": "24.22.3",
+  "test_count": 130,
+  "coverage_percent": {
+    "lines": 91.97,
+    "branches": 86.05,
+    "functions": 74.12
+  },
+  "coverage_scope": "First-party extension TypeScript and fixture .mjs measured by the Node coverage command. Browser fixture page.js and third-party UMD excluded.",
+  "checks": [
+    "clean lockfile install",
+    "lint",
+    "strict TypeScript",
+    "full deterministic suite",
+    "audited package integrity, UMD and MIT license digests",
+    "eight builds with app/appex identifiers and packaged file digests verified"
+  ],
+  "fixtures_sha256": {
+    "fixtures/frame.html": "77d4439996e2319d12729a861443f9a78c866246dbfbc55f152fc808b1d25e16",
+    "fixtures/origins.d.mts": "eb2f65d164336a76c91114059acb93032898a3a1d2c9865f3dc9114e03f9a12c",
+    "fixtures/origins.mjs": "a5d590120935de24b125f210261234111c7ea9cd24ff3315966471006010ca04",
+    "fixtures/page.html": "a83501e43b0263df595919164e4c255c22bed4b20bed5f5c82a0f04a76e21ee4",
+    "fixtures/page.js": "9d9c66d20402ffee4ac2c8e241a34aa9f98cccf3255a930942873ec6732500a3",
+    "fixtures/resource.css": "047ad741240d22785a4f8cdca746edaa004aea1ce9b9ff0e59cce74ae98cb7f0",
+    "fixtures/server.mjs": "709bacb1528049a0cfdffb30b036d66e1861b315cedd51f67189b2c8a2fbd2f1",
+    "fixtures/site.css": "27d043444134e088490cdaf84e57b3fdfd1c200c53b7c0e2bdc9af4c6bd6442c"
+  },
+  "packages": [
+    {
+      "variant": "mv2",
+      "mode": "dynamic",
+      "files": {
+        "DarkReader-LICENSE.txt": "f0a5f835174494f8981b2cbb1a34054d4f887a5c865318650d6a17afe1c7850e",
+        "background.js": "3d4273d6c760b1e714136be83b7a4632fb74f34f3a547eb448624fa1e6be258c",
+        "content.js": "37704d25496b7c0e2f8157eb480929daf18ad515f4a8872ddc402d7da8cd7a66",
+        "darkreader.js": "6bc5cb7bc3dd4014902a73898cfad95e07474755d64abbfe9e7bac02c2f59937",
+        "manifest.json": "f1d88aeeac9cd1892452ad305bb86e57abf0e55b89f7c99ff7b54b6f1a94f2d6",
+        "packaged-control.mjs": "5f6579178023ac056fcbbb072e3e68a53770536616d5f2f677d3d55522740ca9",
+        "popup.html": "07e003d21f1b779b7ff84b0e9fb3f0f354f0fd80d2f76842ae82e087a025b735",
+        "popup.js": "7ffb821081cb29418cfd3deeb3ec411562ad3bedce55f6d5fe5fa70da3a21dd9"
+      },
+      "sha256": "4d4284d20dee42b5c39a6abc9476f62740c7af458ecbcde593e553a4cde1e061"
+    },
+    {
+      "variant": "mv2-ordered-preflight",
+      "mode": "ordered-preflight",
+      "files": {
+        "DarkReader-LICENSE.txt": "f0a5f835174494f8981b2cbb1a34054d4f887a5c865318650d6a17afe1c7850e",
+        "background.js": "3d4273d6c760b1e714136be83b7a4632fb74f34f3a547eb448624fa1e6be258c",
+        "content.js": "e2160f377cb63925425d3ba7bbf44f3e83246a41c7f41c8ad51d01836c1d4563",
+        "darkreader.js": "6bc5cb7bc3dd4014902a73898cfad95e07474755d64abbfe9e7bac02c2f59937",
+        "manifest.json": "6026be02d24003b04c30e5ca16f2388aa55caacc022626814270b1a9adfa0033",
+        "ordered-preflight.js": "d72a016d6648cf16cece59486059d826f7ca3fa088e5b2d2ba4c8bdf92f98e7c",
+        "packaged-control.mjs": "5f6579178023ac056fcbbb072e3e68a53770536616d5f2f677d3d55522740ca9",
+        "popup.html": "07e003d21f1b779b7ff84b0e9fb3f0f354f0fd80d2f76842ae82e087a025b735",
+        "popup.js": "7ffb821081cb29418cfd3deeb3ec411562ad3bedce55f6d5fe5fa70da3a21dd9"
+      },
+      "sha256": "49ec2d9ab615a33ede5e4765947d6466d39e726b4c8ea24b3cbc9c954ff608a0"
+    },
+    {
+      "variant": "mv3",
+      "mode": "dynamic",
+      "files": {
+        "DarkReader-LICENSE.txt": "f0a5f835174494f8981b2cbb1a34054d4f887a5c865318650d6a17afe1c7850e",
+        "background.js": "3d4273d6c760b1e714136be83b7a4632fb74f34f3a547eb448624fa1e6be258c",
+        "content.js": "37704d25496b7c0e2f8157eb480929daf18ad515f4a8872ddc402d7da8cd7a66",
+        "darkreader.js": "6bc5cb7bc3dd4014902a73898cfad95e07474755d64abbfe9e7bac02c2f59937",
+        "manifest.json": "95a5fa3ea1d8cc14a6a8915f21b5c8e88a6860b37c9fa1518ab7f1bf6704a2b2",
+        "packaged-control.mjs": "5f6579178023ac056fcbbb072e3e68a53770536616d5f2f677d3d55522740ca9",
+        "popup.html": "07e003d21f1b779b7ff84b0e9fb3f0f354f0fd80d2f76842ae82e087a025b735",
+        "popup.js": "7ffb821081cb29418cfd3deeb3ec411562ad3bedce55f6d5fe5fa70da3a21dd9"
+      },
+      "sha256": "9e36cf0f19fe9391767b3cbe8647671de91dee3ffac7517a692488dc47cd73b9"
+    },
+    {
+      "variant": "mv3-ordered-preflight",
+      "mode": "ordered-preflight",
+      "files": {
+        "DarkReader-LICENSE.txt": "f0a5f835174494f8981b2cbb1a34054d4f887a5c865318650d6a17afe1c7850e",
+        "background.js": "3d4273d6c760b1e714136be83b7a4632fb74f34f3a547eb448624fa1e6be258c",
+        "content.js": "e2160f377cb63925425d3ba7bbf44f3e83246a41c7f41c8ad51d01836c1d4563",
+        "darkreader.js": "6bc5cb7bc3dd4014902a73898cfad95e07474755d64abbfe9e7bac02c2f59937",
+        "manifest.json": "a60b41bc1db70e65bcc58eca77d0191cc8d8f340974f8240ec71f1b5ff0eea2c",
+        "ordered-preflight.js": "d72a016d6648cf16cece59486059d826f7ca3fa088e5b2d2ba4c8bdf92f98e7c",
+        "packaged-control.mjs": "5f6579178023ac056fcbbb072e3e68a53770536616d5f2f677d3d55522740ca9",
+        "popup.html": "07e003d21f1b779b7ff84b0e9fb3f0f354f0fd80d2f76842ae82e087a025b735",
+        "popup.js": "7ffb821081cb29418cfd3deeb3ec411562ad3bedce55f6d5fe5fa70da3a21dd9"
+      },
+      "sha256": "685891be5f722141856433c2df860a2367dc8eeb6f426f05b834723cac64ccaf"
+    }
+  ]
+}

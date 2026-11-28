@@ -1,0 +1,6 @@
+/* All resource routes use this swatch so a failed read can be compared with the original sheet. */
+#resource-swatch {
+  color: rgb(17, 68, 119);
+  background-color: rgb(249, 221, 151);
+  border-left: 7px solid rgb(39, 112, 82);
+}
