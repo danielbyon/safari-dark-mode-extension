@@ -2,7 +2,7 @@ import { captureNativeDark, type NativeAppearance } from "./native-dark.ts";
 import { CandidateReads, FrameRenderer, effectSample, type Candidate, type RenderInput, type Trace } from "./renderer.ts";
 import { fixtureOrigins } from "./fixture-config.ts";
 
-type Phase = "before-import" | "after-import" | "after-disable";
+import { createCandidateLoader, type MessagePhase } from "./candidate-loader.ts";
 type Observation = { event: string; ms: number; fields?: Parameters<Trace>[1] };
 type World = typeof globalThis & {
     DarkReader?: Candidate;
@@ -26,9 +26,9 @@ function start() {
     let appearance: NativeAppearance | undefined;
     let detect: (() => NativeAppearance) | undefined;
     let systemDark = system.matches;
+    let inputRevision = 0;
     let serial = 0;
     let registered = false;
-    let importing: Promise<void> | undefined;
     let baseline = "";
     let generation = 0;
     let parked = false;
@@ -46,14 +46,14 @@ function start() {
         try { port?.postMessage(message); } catch { /* A disconnect can precede its notification. */ }
     }
 
-    function probeMessage(phase: Phase) {
+    function probeMessage(phase: MessagePhase) {
         const runtime = world.chrome?.runtime;
         if (!runtime?.sendMessage) {
             trace("ordinary-message", { phase, returned: "unavailable" });
             return;
         }
+        const id = ++serial;
         try {
-            const id = ++serial;
             const result = runtime.sendMessage({ type: "probe-echo", id, phase });
             const promise = result != null && typeof (result as Promise<unknown>).then === "function";
             trace("ordinary-message", { phase, id, returned: promise ? "promise" : typeof result });
@@ -61,9 +61,9 @@ function start() {
                 const response = reply as Record<string, unknown> | null;
                 trace("ordinary-reply", { phase, id, echoed: response?.type === "probe-echo" && response.id === id && response.phase === phase,
                     receiverCount: typeof response?.receiverCount === "number" ? response.receiverCount : null });
-            }, () => trace("ordinary-reply-rejected", { phase }));
+            }, () => trace("ordinary-reply-rejected", { phase, id }));
         } catch {
-            trace("ordinary-message", { phase, returned: "threw" });
+            trace("ordinary-message", { phase, id, returned: "threw" });
         }
     }
 
@@ -85,26 +85,17 @@ function start() {
         catch { finish(); }
     }), revision => Boolean(port && decision?.enabled && decision.privileged && decision.revision === revision &&
         location.href === observedURL && system.matches === systemDark && detect?.().scheme === appearance?.scheme), trace);
-    const renderer = new FrameRenderer(document, reads, trace, () => probeMessage("after-disable"));
+    const renderer = new FrameRenderer(document, reads, trace, () => loader.afterDisable());
 
-    function candidateReady() {
-        if (registered) return;
-        if (!world.DarkReader) throw new Error("Packaged UMD did not register in the content world");
-        renderer.register(world.DarkReader);
-        registered = true;
-        probeMessage("after-import");
-    }
-
-    function beginImport() {
-        // A packaged module runs in this isolated world. Safari builds that reject
-        // the load produce an import failure in the observations.
-        if (!importing) {
-            probeMessage("before-import");
-            importing = import(browser.runtime.getURL("darkreader.js")).then(candidateReady);
-        }
-        return importing;
-    }
-
+    const loader = createCandidateLoader({
+        getURL: path => browser.runtime.getURL(path),
+        getCandidate: () => world.DarkReader,
+        register(candidate) {
+            renderer.register(candidate);
+            registered = true;
+        },
+        trace, ordinary: probeMessage,
+    });
     function sampleEffects(source: string, always = false) {
         if (!registered && !always) return;
         const sample = effectSample(document);
@@ -130,7 +121,7 @@ function start() {
         }
         refreshInputs("mutation");
     });
-    function transition(next?: RenderInput) {
+    function transition(next?: RenderInput & { inputRevision: number }) {
         // Drain synchronous old-generation records before drawing the time boundary.
         if (registered && candidateMutation(observer.takeRecords())) sampleEffects("before-decision", true);
         generation++;
@@ -144,13 +135,18 @@ function start() {
         const apply = () => {
             if (expected !== generation || decision !== next || !port) return;
             refreshInputs("poll");
-            if (expected !== generation || decision !== next) return;
+            if (expected !== generation || decision !== next || next.inputRevision !== inputRevision) return;
             try { renderer.apply(next); } catch { trace("render-error", { generation }); }
             observer.takeRecords();
             sampleEffects("after-apply", true);
         };
         if (next.renderer === "candidate" && !registered) {
-            void beginImport().then(apply, () => trace("candidate-import-failed", { generation: expected }));
+            const current = () => {
+                if (expected !== generation || decision !== next || !port) return false;
+                refreshInputs("poll");
+                return expected === generation && decision === next && next.inputRevision === inputRevision;
+            };
+            void loader.load(next.revision, current).then(ready => { if (ready) apply(); });
         } else apply();
     }
 
@@ -174,10 +170,11 @@ function start() {
             (window === window.top && systemDark !== system.matches);
         if (trigger !== "poll" || changed) trace("native-dark-read", { trigger, ...result });
         if (changed || force) {
+            if (appearance?.scheme !== result.scheme || systemDark !== system.matches) inputRevision++;
             appearance = result;
             systemDark = system.matches;
             if (invalidates) transition();
-            post({ type: "report", nativeDark: result.scheme, systemDark });
+            post({ type: "report", nativeDark: result.scheme, systemDark, inputRevision });
         }
     }
     function connect() {
@@ -185,7 +182,7 @@ function start() {
         try {
             const current = browser.runtime.connect({ name: "probe-document" });
             port = current;
-            type FrameMessage = ({type: "decision"; instance: string; reason: string} & RenderInput)
+            type FrameMessage = ({type: "decision"; instance: string; reason: string; inputRevision: number} & RenderInput)
                 | {type: "read-result"; revision: number; id: number; ok: boolean; css?: string};
             let lastRevision = -1;
             current.onMessage.addListener(raw => {
@@ -194,6 +191,11 @@ function start() {
                 if (message.type === "decision") {
                     if (!detect || !Number.isSafeInteger(message.revision)) return;
                     if (lastRevision >= message.revision) return;
+                    if (message.enabled) {
+                        refreshInputs("poll");
+                        // Only the background can grant an exception for the document's latest inputs.
+                        if (port !== current || message.inputRevision !== inputRevision) return;
+                    }
                     lastRevision = message.revision;
                     trace("content-decision", { revision: message.revision, enabled: message.enabled, privileged: message.privileged });
                     transition(message);

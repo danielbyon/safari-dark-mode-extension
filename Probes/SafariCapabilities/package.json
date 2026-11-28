@@ -8,12 +8,15 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:ordered": "node scripts/build.mjs ordered-preflight",
     "lint": "biome lint extension fixtures scripts tests",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",
+    "compare:ordered": "node scripts/compare-ordered.mjs",
     "coverage": "node --test --experimental-test-coverage --test-coverage-include='**/extension/*.ts' --test-coverage-include='**/fixtures/*.mjs' tests/*.test.mjs",
     "fixtures": "node fixtures/server.mjs",
-    "package": "bash scripts/package-macos-ios.sh"
+    "package": "bash scripts/package-macos-ios.sh",
+    "package:ordered": "bash scripts/package-macos-ios.sh ordered-preflight"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.9",

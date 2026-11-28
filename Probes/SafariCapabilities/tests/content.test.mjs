@@ -7,6 +7,8 @@ test("the document port applies only current decisions, including while the pack
     const styles = new Set();
     const echoes = [];
     const imported = Promise.withResolvers();
+    const dispatched = Promise.withResolvers();
+    const enabled = Promise.withResolvers();
     let deliver;
     let disconnect;
     const runtime = {
@@ -15,12 +17,17 @@ test("the document port applies only current decisions, including while the pack
             const port = {
                 onMessage: { addListener(handler) { deliver = handler; } },
                 onDisconnect: { addListener(handler) { disconnect = handler; port.disconnect = handler; } },
-                postMessage(message) { sent.push(message); },
+                postMessage(message) {
+                    sent.push(message);
+                    if (message.event === "candidate-enabled") enabled.resolve();
+                },
             };
             return port;
         },
         getURL(path) {
+            if (path === "packaged-control.mjs") return new URL("../extension/packaged-control.mjs", import.meta.url).href;
             assert.equal(path, "darkreader.js");
+            dispatched.resolve();
             return new URL("../node_modules/darkreader/darkreader.js", import.meta.url).href;
         },
         sendMessage(message) {
@@ -68,14 +75,15 @@ test("the document port applies only current decisions, including while the pack
     });
     await import("../extension/content.ts");
     const decision = (revision, overrides) => ({
-        type: "decision", instance: "test", revision, reason: "active", enabled: true, privileged: false, fix: true,
+        type: "decision", instance: "test", revision, inputRevision: sent.findLast(m => m.type === "report").inputRevision,
+        reason: "active", enabled: true, privileged: false, fix: true,
         renderer: "marker", appearance: { mode: "adaptive", theme: "graphite", brightness: 100, linkColor: "#336699" },
         ...overrides,
     });
     const registration = sent.find(message => message.type === "hello").registration;
     assert.match(registration, /^[a-f0-9]{32}$/);
     assert.deepEqual(sent.find(message => message.type === "report"), {
-        type: "report", nativeDark: "light", systemDark: false,
+        type: "report", inputRevision: 1, nativeDark: "light", systemDark: false,
     });
     deliver(decision(1));
     assert.equal(styles.size, 1);
@@ -84,6 +92,7 @@ test("the document port applies only current decisions, including while the pack
     assert.equal(styles.size, 0);
 
     deliver(decision(3, { renderer: "candidate" }));
+    await dispatched.promise;
     deliver(decision(4, { enabled: false }));
     await imported.promise;
     assert.deepEqual(echoes.map(message => message.phase), ["before-import", "after-import"]);
@@ -96,6 +105,7 @@ test("the document port applies only current decisions, including while the pack
     t.mock.method(globalThis.DarkReader, "enable", () => {});
     t.mock.method(globalThis.DarkReader, "disable", () => {});
     deliver(decision(5, { renderer: "candidate", privileged: true }));
+    await enabled.promise;
     const url = "http://127.0.0.1:8788/css/opaque.css";
     const first = hook(url);
     const request = sent.filter(message => message.type === "read").at(-1);

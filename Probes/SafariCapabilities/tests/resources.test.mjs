@@ -222,7 +222,7 @@ async function boot(t, stores = {}, incognito = false) {
         frames.set(id, frame);
         const p = connect("probe-document", {id: runtime.id, tab: {...tab}, frameId: id, documentId: browserId, url, origin: new URL(url).origin});
         p.onMessage.fire({type:"hello", registration});
-        p.onMessage.fire({type:"report", nativeDark:"light", systemDark:true});
+        p.onMessage.fire({type:"report", inputRevision:1, nativeDark:"light", systemDark:true});
         await drain();
         p.read = async (id, url = `${origins.resource}/css/opaque.css`, revision = p.last("decision")?.revision) => {
             p.onMessage.fire({type:"read", id, revision, url});
@@ -272,13 +272,72 @@ test("background binds popup and document roles to Safari senders and fails clos
     assert.deepEqual((await e.act("refresh")).observations.findLast(row => row.event === "injected").readyState, "loading");
     assert.ok(!JSON.stringify(e.last("state").observations).includes("private URL"));
     doc.onMessage.fire({type:"trace", event:"candidate-body-delivered", fields:{revision:8, bytes:34, ms:56}});
+    doc.onMessage.fire({type:"trace", event:"candidate-load-stage", fields:{mode:"dynamic", asset:"control",
+        stage:"import", result:"rejected", errorClass:"TypeError", message:"private URL", url:"private URL"}});
+    doc.onMessage.fire({type:"trace", event:"marker-root-style", fields:{result:"unchanged",
+        beforeColor:"rgb(24, 35, 50)", expectedColor:"rgb(224, 244, 255)", afterColor:"rgb(24, 35, 50)",
+        afterBackground:"private URL"}});
     const observations = (await e.act("refresh")).observations;
+    const stage = observations.findLast(row => row.event === "candidate-load-stage");
+    assert.deepEqual([stage.mode, stage.asset, stage.stage, stage.result, stage.errorClass],
+        ["dynamic", "control", "import", "rejected", "TypeError"]);
+    const marker = observations.findLast(row => row.event === "marker-root-style");
+    assert.deepEqual([marker.result, marker.beforeColor, marker.expectedColor, marker.afterColor],
+        ["unchanged", "rgb(24, 35, 50)", "rgb(224, 244, 255)", "rgb(24, 35, 50)"]);
+    assert.ok(!JSON.stringify(observations).includes("private URL"));
     const delivered = observations.findLast(row => row.event === "candidate-body-delivered");
     assert.equal(delivered.bytes,34);
     assert.equal(delivered.revision,8);
     assert.equal(delivered.ms,56);
     assert.equal(observations.findLast(row => row.event === "ordinary-receiver").phase,"before-import");
 });
+
+for (const [role, waitAt] of [["top", "grant"], ["top", "frame tree"], ["frame", "frame tree"]]) {
+    test(`revoking the ${role} role retires a decision suspended at the ${waitAt} lookup`, {timeout: 3000}, async t => {
+        const b = await boot(t);
+        const setup = await b.editor();
+        await b.calibrate(setup, "top");
+        if (role === "frame") await b.calibrate(setup, "frame");
+        const top = await b.doc();
+        const doc = role === "top" ? top : await b.doc({id:1, parent:0, url:`${origins.frame}/frame.html`});
+        const e = await b.editor();
+        assert.equal(doc.last("decision").enabled, true);
+        const entered = Promise.withResolvers();
+        const release = Promise.withResolvers();
+        const target = waitAt === "grant" ? b.safari.permissions : b.safari.webNavigation;
+        const method = waitAt === "grant" ? "contains" : "getAllFrames";
+        const original = target[method];
+        let calls = 0;
+        const holdCount = role === "frame" ? 2 : 1;
+        t.mock.method(target, method, async (...args) => {
+            const value = await original(...args);
+            if (++calls <= holdCount) {
+                if (calls === holdCount) entered.resolve();
+                await release.promise;
+            }
+            return value;
+        });
+        const evaluating = e.act("renderer", "candidate");
+        await entered.promise;
+        b.granted[role] = false;
+        b.safari.permissions.onRemoved.fire({origins:[`${origins[role]}/*`]});
+        const afterRevocation = doc.messages.length - 1;
+        assert.equal(doc.last("decision").enabled, false);
+        release.resolve();
+        await evaluating;
+        await drain();
+        const decisions = doc.messages.slice(afterRevocation).filter(m => m.type === "decision");
+        assert.ok(decisions.length);
+        assert.ok(decisions.every(m => !m.enabled && !m.privileged));
+        if (role === "frame") assert.equal(top.last("decision").enabled, true);
+        assert.equal((await doc.read(19)).ok, false);
+        assert.equal(globalThis.fetch.mock.callCount(), 0);
+        b.granted[role] = true;
+        b.safari.permissions.onAdded.fire({origins:[`${origins[role]}/*`]});
+        await drain();
+        assert.equal(doc.last("decision").enabled, true);
+    });
+}
 
 test("background grant pair changes only the resource setting and rejects stale registered senders", async t => {
     const b = await boot(t);
@@ -308,6 +367,42 @@ test("background grant pair changes only the resource setting and rejects stale 
     b.tab.url = `${origins.frame}/elsewhere`;
     assert.equal((await stale.read(2)).ok, false);
     assert.equal(globalThis.fetch.mock.callCount(), 1);
+});
+
+test("current document reports preserve preview and Use My Theme while independent frame grants still apply", async t => {
+    const b = await boot(t);
+    const calibration = await b.editor();
+    await b.calibrate(calibration, "top");
+    await b.calibrate(calibration, "frame");
+    const doc = await b.doc();
+    const child = await b.doc({id:1, parent:0, url:`${origins.frame}/frame.html`});
+    const e = await b.editor();
+    const report = async (inputRevision, nativeDark, systemDark) => {
+        doc.onMessage.fire({type:"report", inputRevision, nativeDark, systemDark});
+        await drain();
+        return doc.last("decision");
+    };
+    assert.equal((await report(2, "dark", true)).reason, "native-dark");
+    assert.equal(doc.last("decision").inputRevision, 2);
+    assert.equal((await report(1, "light", true)).inputRevision, 2);
+    await e.act("preview", {scope:"global", fields:{theme:"ocean"}});
+    assert.equal(doc.last("decision").reason, "preview");
+    assert.equal(child.last("decision").reason, "preview");
+    assert.equal(child.last("decision").inputRevision, 1);
+    b.granted.frame = false;
+    b.safari.permissions.onRemoved.fire({origins:[`${origins.frame}/*`]});
+    await drain();
+    assert.equal(child.last("decision").enabled, false);
+    assert.equal(doc.last("decision").reason, "preview");
+    await e.act("discard");
+    assert.equal(doc.last("decision").reason, "native-dark");
+    await e.act("saved", {scope:"global", fields:{useMyTheme:true}});
+    assert.equal(doc.last("decision").reason, "active");
+    assert.equal((await report(3, "dark", false)).reason, "system-light");
+    assert.equal(doc.last("decision").inputRevision, 3);
+    await e.act("saved", {scope:"global", fields:{activation:"on"}});
+    assert.equal(doc.last("decision").enabled, true);
+    assert.equal(child.last("decision").enabled, false);
 });
 
 test("editor previews resolve against current saves and expire on dismissal and same-document navigation", async t => {

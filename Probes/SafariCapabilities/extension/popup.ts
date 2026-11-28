@@ -113,15 +113,36 @@ function isState(message: object): message is PopupState {
         && "renderer" in message && typeof message.renderer === "string"
         && "access" in message && typeof message.access === "string"
         && "paused" in message && typeof message.paused === "boolean"
+        && "private" in message && typeof message.private === "boolean"
         && "savedRevision" in message && typeof message.savedRevision === "number";
 }
 
+// The inspector can correlate ports locally. An exported snapshot contains only fixture
+// conditions, computed effects and ordered observations, without port identities or paths.
+const evidenceKeys = [
+    "type", "paused", "renderer", "access", "savedRevision", "decision", "reason", "enabled", "fix",
+    "privileged", "revision", "inputRevision", "grants", "top", "frame", "resource", "denied", "calibration",
+    "observed", "expected", "qualified", "role", "stage", "asset", "errorClass", "observations", "event", "sequence", "phase", "returned",
+    "echoed", "receiverCount", "at", "ms", "readyState", "scheme", "trigger", "source", "eligible", "fresh",
+    "bytes", "generation", "sheets", "rules", "hash", "opaque", "fixVersion", "mode",
+    "swatchColor", "swatchBackground", "swatchBorder", "controlOutline",
+    "beforeColor", "beforeBackground", "expectedColor", "expectedBackground", "afterColor", "afterBackground", "result",
+];
+
+function hideExport() {
+    const link = element<HTMLAnchorElement>("export");
+    link.hidden = true;
+    link.removeAttribute("href");
+}
+
 port.onMessage.addListener(message => {
+    if (!message || typeof message !== "object") { hideExport(); return; }
     if ("type" in message && message.type === "error" && "reason" in message) {
+        hideExport();
         element("status").textContent = String(message.reason);
         return;
     }
-    if (!isState(message)) return;
+    if (!isState(message)) { hideExport(); return; }
     previewActive = message.preview != null;
     checkbox("pause").checked = message.paused;
     select("renderer").value = message.renderer;
@@ -137,12 +158,17 @@ port.onMessage.addListener(message => {
         protectEndpoints();
     }
     element("status").textContent = `${message.decision?.reason ?? "Waiting for a fixture document"} · saved revision ${message.savedRevision}`;
-    const snapshot = JSON.stringify(message, null, 2);
-    element("observations").textContent = snapshot;
+    element("observations").textContent = JSON.stringify(message, null, 2);
     const exportLink = element<HTMLAnchorElement>("export");
-    exportLink.hidden = message.private;
-    if (message.private) exportLink.removeAttribute("href");
-    else exportLink.href = `data:application/json;charset=utf-8,${encodeURIComponent(snapshot)}`;
+    if (message.private) hideExport();
+    else {
+        const snapshot = JSON.stringify(message, evidenceKeys, 2);
+        exportLink.href = `data:application/json;charset=utf-8,${encodeURIComponent(snapshot)}`;
+        exportLink.hidden = false;
+    }
 });
-port.onDisconnect.addListener(() => { element("status").textContent = "Background disconnected. Reopen the popup to reconnect."; });
+port.onDisconnect.addListener(() => {
+    hideExport();
+    element("status").textContent = "Background disconnected. Reopen the popup to reconnect.";
+});
 send("refresh");

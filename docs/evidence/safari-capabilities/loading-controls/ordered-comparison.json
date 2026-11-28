@@ -1,0 +1,107 @@
+[
+  {
+    "environment": "synthetic-classic-script",
+    "siteGrant": "assumed",
+    "runAt": "document_start",
+    "scripts": [
+      "before.js",
+      "darkreader.js",
+      "after.js"
+    ],
+    "umdSHA256": "6bc5cb7bc3dd4014902a73898cfad95e07474755d64abbfe9e7bac02c2f59937",
+    "activation": true,
+    "messages": [
+      {
+        "id": 1,
+        "phase": "before-import",
+        "returned": "promise",
+        "reply": "echoed",
+        "replyReceiverCount": 1
+      },
+      {
+        "id": 2,
+        "phase": "after-import",
+        "returned": "undefined",
+        "reply": "unavailable"
+      },
+      {
+        "id": 3,
+        "phase": "after-disable",
+        "returned": "undefined",
+        "reply": "unavailable"
+      }
+    ],
+    "apiBeforeList": "undefined",
+    "publicAPI": true,
+    "enabledAfterList": false,
+    "enable": {
+      "call": "returned",
+      "isEnabled": true
+    },
+    "fallbackStyleAfterEnable": true,
+    "disable": {
+      "call": "returned",
+      "isEnabled": false
+    },
+    "fallbackStyleAfterDisable": false,
+    "received": [
+      {
+        "id": 1,
+        "phase": "before-import",
+        "receiverCount": 1
+      },
+      {
+        "id": 2,
+        "phase": "after-import",
+        "receiverCount": 1
+      },
+      {
+        "id": 3,
+        "phase": "after-disable",
+        "receiverCount": 1
+      }
+    ]
+  },
+  {
+    "environment": "synthetic-classic-script",
+    "siteGrant": "assumed",
+    "runAt": "document_start",
+    "scripts": [
+      "before.js",
+      "darkreader.js",
+      "after.js"
+    ],
+    "umdSHA256": "6bc5cb7bc3dd4014902a73898cfad95e07474755d64abbfe9e7bac02c2f59937",
+    "activation": false,
+    "messages": [
+      {
+        "id": 1,
+        "phase": "before-import",
+        "returned": "promise",
+        "reply": "echoed",
+        "replyReceiverCount": 1
+      },
+      {
+        "id": 2,
+        "phase": "after-import",
+        "returned": "undefined",
+        "reply": "unavailable"
+      }
+    ],
+    "apiBeforeList": "undefined",
+    "publicAPI": true,
+    "enabledAfterList": false,
+    "received": [
+      {
+        "id": 1,
+        "phase": "before-import",
+        "receiverCount": 1
+      },
+      {
+        "id": 2,
+        "phase": "after-import",
+        "receiverCount": 1
+      }
+    ]
+  }
+]

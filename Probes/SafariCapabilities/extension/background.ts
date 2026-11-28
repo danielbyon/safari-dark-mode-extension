@@ -2,6 +2,7 @@ import {
     DEFAULT_PREFERENCES, resolvePreferences, decideEligibility,
     type Access, type AppearanceDraft, type SavedPreferences, type Scope, type Appearance,
 } from "./eligibility.ts";
+import { candidateLoadTrace } from "./candidate-loader.ts";
 import { fixtureOrigins, resourcePaths } from "./fixture-config.ts";
 import { TabLifecycle, type OverrideRecord } from "./lifecycle.ts";
 import {
@@ -16,13 +17,13 @@ type Detection = "light" | "dark" | "unknown";
 type Renderer = "marker" | "candidate";
 type Decision = {
     type: "decision"; instance: string; revision: number; enabled: boolean; fix: boolean;
-    reason: string; appearance: Appearance; renderer: Renderer; privileged: boolean;
+    reason: string; appearance: Appearance; renderer: Renderer; privileged: boolean; inputRevision: number;
 };
 type LiveTab = { life: TabLifecycle; url: URL; documentId: string; private: boolean };
 type Doc = {
     port: Port; tabId: number; frameId: number; url: URL; documentId?: string; private: boolean;
     bindingId: string; tabAlias: number; alias: number; awaitingCommit: boolean; fresh: boolean; registration?: string; ancestors?: number[]; nativeDark?: Detection; systemDark: boolean; reader: DocumentReader;
-    fingerprint?: string; decision?: Decision; eligibleRoles: Set<FixtureRole>;
+    fingerprint?: string; decision?: Decision; eligibleRoles: Set<FixtureRole>; inputRevision: number;
 };
 type Editor = {port: Port; tabId: number; private: boolean; token?: symbol; connected: boolean; displaced: boolean};
 type Settings = {paused: boolean; renderer: Renderer; access: Access; schedule: Schedule; saved: SavedPreferences};
@@ -72,12 +73,15 @@ function documentId(value: object): string | undefined {
 const traceEvents = new Set([
     "injected", "ordinary-message", "ordinary-reply", "ordinary-reply-rejected", "native-dark-read",
     "candidate-hook-entry", "candidate-hook-refused", "stale-response-rejected", "candidate-response-released", "candidate-body-delivered",
-    "candidate-enabled", "candidate-disabled", "marker-enabled", "content-read-invalidated", "render-effects",
-    "candidate-dom-mutation", "teardown-error", "render-error", "candidate-import-failed",
+    "candidate-enabled", "candidate-disabled", "marker-inserted", "marker-root-style", "content-read-invalidated", "render-effects",
+    "candidate-dom-mutation", "teardown-error", "render-error", "candidate-load-stage",
+    "candidate-enable-attempt", "candidate-enable-failed", "candidate-disable-failed",
     "document-disconnected", "document-port-unavailable", "content-decision",
 ]);
 const traceNumbers = new Set("ms at revision bytes id generation receiverCount sheets rules hash opaque fixVersion".split(" "));
 const traceFlags = new Set("top enabled eligible echoed privileged".split(" "));
+const rootColorFields = new Set(["beforeColor", "beforeBackground", "expectedColor", "expectedBackground", "afterColor", "afterBackground"]);
+const markerResults = new Set(["applied", "unchanged", "already-matched", "mismatch", "unavailable"]);
 const traceEnums = new Set(("before-import after-import after-disable unavailable promise undefined object function threw " +
     "mutation before-decision after-teardown after-apply snapshot poll connect document-ready visible history hash " +
     "system light dark unknown unreadable no-declaration root-declaration ambiguous loading interactive complete dynamic").split(" "));
@@ -179,6 +183,8 @@ export function registerBackground(api: typeof browser) {
     const isolated = stateForContext();
     const context = (incognito: boolean) => incognito ? isolated : regular;
     let revision = 0;
+    // A permission event retires grant samples even while Safari is resolving the frame tree.
+    let permissionEpoch = 0;
     let queued = 0;
     let tail: Promise<void> = Promise.resolve();
 
@@ -265,19 +271,21 @@ export function registerBackground(api: typeof browser) {
     async function authorizeRead(doc: Doc, url: URL, expectedRevision: number) {
         const role = roleOf(url);
         if (!role || !doc.eligibleRoles.has(role)) return false;
+        const epoch = permissionEpoch;
         const grants = await sampleGrants();
         const roles = await authorizedFrames(doc, grants);
+        if (epoch !== permissionEpoch) return false;
         const permit = !!roles && grants[role] === true && context(doc.private).proof.qualified(role, roles);
         observe(doc, "read-grant-check", {destination: role, grants, permit});
         return permit && queued === 0 && doc.decision?.revision === expectedRevision && inputs(doc, true).decision.render;
     }
 
-    async function updateDocument(doc: Doc, grants: GrantSnapshot) {
+    async function updateDocument(doc: Doc, grants: GrantSnapshot, epoch: number) {
         const roles = await authorizedFrames(doc, grants);
-        if (!live(doc)) return;
+        if (epoch !== permissionEpoch || !live(doc)) return;
         const {data, decision} = inputs(doc, !!roles);
         const draft = tabs.get(doc.tabId)?.life.preview;
-        const fingerprint = JSON.stringify([data, draft, settings.renderer, doc.url.href, roles ?? null]);
+        const fingerprint = JSON.stringify([data, draft, settings.renderer, doc.url.href, roles ?? null, doc.inputRevision]);
         if (fingerprint === doc.fingerprint) return;
         if (doc.decision?.enabled) doc.reader.invalidate();
         const next = ++revision;
@@ -287,15 +295,19 @@ export function registerBackground(api: typeof browser) {
         doc.decision = {
             type: "decision", instance, revision: next, reason: decision.reason, renderer: settings.renderer,
             enabled: decision.render, fix: decision.render, privileged, appearance: data.preferences.appearance,
+            inputRevision: doc.inputRevision,
         };
         post(doc.port, doc.decision);
         observe(doc, "decision", {revision: next, reason: decision.reason, privileged});
     }
 
     async function refresh(tabId?: number) {
+        const epoch = permissionEpoch;
         const grants = await sampleGrants();
+        if (epoch !== permissionEpoch) return;
         const targets = [...documents.values()].filter(doc => tabId === undefined || doc.tabId === tabId);
-        await Promise.all(targets.map(doc => updateDocument(doc, grants)));
+        await Promise.all(targets.map(doc => updateDocument(doc, grants, epoch)));
+        if (epoch !== permissionEpoch) return;
         for (const e of editors) if (e.connected && (tabId === undefined || e.tabId === tabId)) publish(e, grants);
     }
 
@@ -400,7 +412,7 @@ export function registerBackground(api: typeof browser) {
         tabAliases.set(tabId, tabAlias);
         const doc: Doc = {
             bindingId: browserId ?? uid(), tabAlias, alias: ++nextDocumentAlias, awaitingCommit: navigating.get(k) === url.href,
-            port, tabId, frameId, url, documentId: browserId, private: incognito, fresh, reader, systemDark: false,
+            port, tabId, frameId, url, documentId: browserId, private: incognito, fresh, reader, systemDark: false, inputRevision: 0,
             eligibleRoles: new Set(fixtureRoles.filter(role => context(incognito).proof.qualified(role))),
         };
         documents.set(k, doc);
@@ -440,7 +452,9 @@ export function registerBackground(api: typeof browser) {
                 });
             } else if (message.type === "report" && typeof message.systemDark === "boolean" &&
                 (message.nativeDark === "light" || message.nativeDark === "dark" || message.nativeDark === "unknown")) {
-                if (doc.nativeDark === message.nativeDark && doc.systemDark === message.systemDark) return;
+                if (typeof message.inputRevision !== "number" || !Number.isSafeInteger(message.inputRevision) ||
+                    message.inputRevision <= doc.inputRevision) return;
+                doc.inputRevision = message.inputRevision;
                 doc.nativeDark = message.nativeDark;
                 doc.systemDark = message.systemDark;
                 enqueue(() => refresh(tabId));
@@ -455,8 +469,19 @@ export function registerBackground(api: typeof browser) {
         const fields: Fields = {};
         if (typeof message.ms === "number" && Number.isFinite(message.ms)) fields.ms = message.ms;
         if (object(message.fields)) for (const [name, value] of Object.entries(message.fields)) {
+            if (message.event === "candidate-load-stage") {
+                const allowed: readonly string[] | undefined = Object.hasOwn(candidateLoadTrace, name)
+                    ? candidateLoadTrace[name as keyof typeof candidateLoadTrace] : undefined;
+                if (allowed && typeof value === "string" && allowed.includes(value)) fields[name] = value;
+            }
+            if ((message.event === "candidate-enable-failed" || message.event === "candidate-disable-failed") &&
+                name === "errorClass" && candidateLoadTrace.errorClass.some(label => value === label)) fields[name] = value;
             if (traceNumbers.has(name) && (value === null || (typeof value === "number" && Number.isFinite(value)))) fields[name] = value;
             if (traceFlags.has(name) && typeof value === "boolean") fields[name] = value;
+            if (message.event === "marker-root-style") {
+                if (name === "result" && typeof value === "string" && markerResults.has(value)) fields[name] = value;
+                if (rootColorFields.has(name) && (value === null || (typeof value === "string" && /^rgba?\([0-9., %/]+\)$/.test(value)))) fields[name] = value;
+            }
             if (["phase","returned","trigger","source","scheme","reason","readyState","mode"].includes(name) &&
                 typeof value === "string" && traceEnums.has(value)) fields[name] = value;
             if (["swatchColor","swatchBackground","swatchBorder","controlOutline"].includes(name) &&
@@ -474,7 +499,7 @@ export function registerBackground(api: typeof browser) {
     function requireLiveEditor(e: Editor) {
         const tab = tabs.get(e.tabId);
         const top = documents.get(key(e.tabId, 0));
-        if (!tab || !tab.life.ownsEditor(e.token) || !e.connected || tab.private !== e.private || top?.bindingId !== tab.documentId ||
+        if (!tab?.life.ownsEditor(e.token) || !e.connected || tab.private !== e.private || top?.bindingId !== tab.documentId ||
             top.url.href !== tab.url.href) throw Error("open-editor-on-fixture");
         return tab;
     }
@@ -508,7 +533,9 @@ export function registerBackground(api: typeof browser) {
                 if (!object(value) || !fixtureRoles.includes(value.role as FixtureRole) ||
                     !["allow", "deny", "ask"].includes(String(value.expected))) throw Error("invalid-sample");
                 const c = context(e.private);
+                const epoch = permissionEpoch;
                 const grants = await sampleGrants();
+                if (epoch !== permissionEpoch) throw Error("permission-changed");
                 if (!e.connected) return;
                 const sample = c.proof.record(value.role as FixtureRole, value.expected as Setting, grants);
                 // Changing the calibration changes the basis for a read. Re-arm on a fresh navigation.
@@ -753,6 +780,7 @@ export function registerBackground(api: typeof browser) {
     });
     for (const event of [api.permissions?.onAdded, api.permissions?.onRemoved]) {
         event?.addListener(() => {
+            permissionEpoch++;
             for (const doc of documents.values()) {
                 doc.reader.invalidate();
                 doc.fingerprint = undefined;

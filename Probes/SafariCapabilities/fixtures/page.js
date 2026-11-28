@@ -11,7 +11,9 @@
   let resourceCheck = "unmeasured";
   let adopted = "unmeasured";
   let requestedWP = false;
-  const initialTheme = new URLSearchParams(location.search).get("theme");
+  const initialParams = new URLSearchParams(location.search);
+  const policyRequest = initialParams.get("csp") === "strict" ? "strict" : "ordinary";
+  const initialTheme = initialParams.get("theme");
   let requestedTheme = initialTheme === "dark" || initialTheme === "system" ? initialTheme : "light";
   let visit = "document";
   let revision = 0;
@@ -23,6 +25,18 @@
     catch (error) { return error.name === "SecurityError" ? "unreadable" : "error"; }
   }
 
+  // The fixture's active theme sheet supplies the reference colors even with the extension off.
+  function themeRuleSample(link, computed) {
+    try {
+      const rule = link?.sheet?.cssRules[0];
+      if (rule?.selectorText !== ":root") return null;
+      const { color, backgroundColor: background } = rule.style;
+      return { color, background, matchesRoot: computed.color === color && computed.backgroundColor === background };
+    } catch {
+      return null;
+    }
+  }
+
   function observe(action) {
     const root = document.documentElement;
     const css = getComputedStyle(root);
@@ -32,11 +46,14 @@
     const reference = id("deliberate-low-contrast");
     const referenceStyle = reference && getComputedStyle(reference);
     const meta = document.querySelector('meta[name="theme-color"]').content;
+    const themeSheets = ["sheet-a", "sheet-b"].map(id);
+    const siteSheetConditions = themeSheets.map(link => matchMedia(link.media).matches);
+    const activeTheme = themeSheets.find((_, index) => siteSheetConditions[index]);
     // Record whether typed text survived. Never copy the text or document URL into the result.
     records.push({
       seq: ++revision, action, ms: Math.round(performance.now()), firstScript, visit,
       requestedTheme, systemDark: matchMedia("(prefers-color-scheme: dark)").matches,
-      siteSheetConditions: ["sheet-a", "sheet-b"].map(name => matchMedia(id(name).media).matches),
+      policyRequest, siteSheetConditions, themeRule: themeRuleSample(activeTheme, css),
       root: { scheme: css.colorScheme, color: css.color, background: css.backgroundColor },
       requestedWP, wpPreset: root.hasAttribute("data-wp-dark-mode-preset"),
       wpClass: root.classList.contains("wp-dark-mode-active"), wpAttribute: root.hasAttribute("data-wp-dark-mode-active"),

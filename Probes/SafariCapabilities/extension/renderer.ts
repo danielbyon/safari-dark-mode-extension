@@ -1,4 +1,5 @@
 import type DarkReader from "darkreader";
+import { candidateErrorClass } from "./candidate-loader.ts";
 import type { Appearance } from "./eligibility.ts";
 
 export type Candidate = Pick<typeof DarkReader, "enable" | "disable" | "isEnabled" | "setFetchMethod">;
@@ -91,6 +92,27 @@ function appendStyle(doc: Document, css: string) {
     return style;
 }
 
+type RootColors = { color: string | null; background: string | null };
+
+/** Copy both values immediately. A retained CSSStyleDeclaration follows later style changes. */
+function rootColors(doc: Document): RootColors {
+    try {
+        const css = doc.documentElement && doc.defaultView?.getComputedStyle(doc.documentElement);
+        return { color: css?.color || null, background: css?.backgroundColor || null };
+    } catch {
+        return { color: null, background: null };
+    }
+}
+
+function markerResult(before: RootColors, expected: RootColors, after: RootColors) {
+    if (!before.color || !before.background || !after.color || !after.background) return "unavailable";
+    const changed = before.color !== after.color || before.background !== after.background;
+    if (after.color === expected.color && after.background === expected.background) {
+        return changed ? "applied" : "already-matched";
+    }
+    return changed ? "mismatch" : "unchanged";
+}
+
 export class FrameRenderer {
     private doc: Document;
     private reads: CandidateReads;
@@ -120,6 +142,9 @@ export class FrameRenderer {
             try {
                 this.candidate.disable();
                 this.trace("candidate-disabled", { enabled: this.candidate.isEnabled() });
+            } catch (error) {
+                this.trace("candidate-disable-failed", { errorClass: candidateErrorClass(error) });
+                throw error;
             } finally {
                 this.candidateStarted = false;
                 this.afterDisable();
@@ -142,19 +167,32 @@ export class FrameRenderer {
             this.reads.bind(input.revision);
             this.candidateStarted = true;
             try {
+                this.trace("candidate-enable-attempt", { revision: input.revision });
                 this.candidate.enable({
                     brightness,
                     ...(mode === "palette" && { darkSchemeBackgroundColor: "#112535", darkSchemeTextColor: "#e0f4ff" }),
                 }, { css: `${linkCSS}\n${repair}` });
                 this.trace("candidate-enabled", { enabled: this.candidate.isEnabled(), revision: input.revision, fixVersion: input.fix ? FIX_VERSION : null });
             } catch (error) {
+                this.trace("candidate-enable-failed", { revision: input.revision, errorClass: candidateErrorClass(error) });
                 this.disable();
                 throw error;
             }
         } else {
-            const background = mode === "palette" ? "#112535" : "#181a1b";
-            this.marker = appendStyle(this.doc, `:root { --probe-brightness: ${brightness}; background-color: ${background} !important; color: #e0f4ff !important; }\n${linkCSS}\n${repair}`);
-            this.trace("marker-enabled", { revision: input.revision, fixVersion: input.fix ? FIX_VERSION : null });
+            const expected = {
+                color: "rgb(224, 244, 255)",
+                background: mode === "palette" ? "rgb(17, 37, 53)" : "rgb(24, 26, 27)",
+            };
+            const before = rootColors(this.doc);
+            this.marker = appendStyle(this.doc, `:root { --probe-brightness: ${brightness}; background-color: ${expected.background} !important; color: ${expected.color} !important; }\n${linkCSS}\n${repair}`);
+            this.trace("marker-inserted", { revision: input.revision, fixVersion: input.fix ? FIX_VERSION : null });
+            const after = rootColors(this.doc);
+            this.trace("marker-root-style", {
+                revision: input.revision, result: markerResult(before, expected, after),
+                beforeColor: before.color, beforeBackground: before.background,
+                expectedColor: expected.color, expectedBackground: expected.background,
+                afterColor: after.color, afterBackground: after.background,
+            });
         }
     }
 }

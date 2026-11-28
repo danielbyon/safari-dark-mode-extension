@@ -66,6 +66,81 @@ test("the reversible marker and fix own one style element", () => {
     assert.throws(() => renderer.apply({ ...input, appearance: { ...input.appearance, linkColor: "red; }" } }), /Invalid/);
 });
 
+const website = { color: "rgb(24, 35, 50)", backgroundColor: "rgb(250, 250, 250)" };
+const adaptive = { color: "rgb(224, 244, 255)", backgroundColor: "rgb(24, 26, 27)" };
+const palette = { color: "rgb(224, 244, 255)", backgroundColor: "rgb(17, 37, 53)" };
+
+// CSSOM exposes live declarations. Read each property against the current node set.
+function markerDocument(before, after) {
+    let style;
+    const colors = () => style ? after : before;
+    const live = {
+        get color() { return colors().color; },
+        get backgroundColor() { return colors().backgroundColor; },
+    };
+    const root = {};
+    return {
+        documentElement: root,
+        createElement: () => ({ remove() { style = undefined; } }),
+        head: { append(node) { style = node; } },
+        defaultView: { getComputedStyle(node) { assert.equal(node, root); return live; } },
+        get inserted() { return style; },
+    };
+}
+
+for (const [name, before, after, mode, result] of [
+    ["ordinary light", website, adaptive, "adaptive", "applied"],
+    ["inserted style with no computed effect", website, website, "adaptive", "unchanged"],
+    ["website already has both marker colors", adaptive, adaptive, "adaptive", "already-matched"],
+    ["only the foreground changes", website, { ...website, color: adaptive.color }, "adaptive", "mismatch"],
+    ["palette mode", website, palette, "palette", "applied"],
+    ["missing baseline", {}, adaptive, "adaptive", "unavailable"],
+    ["missing background after append", website, { color: adaptive.color }, "adaptive", "unavailable"],
+]) {
+    test(`marker root measurements: ${name}`, () => {
+        const doc = markerDocument(before, after);
+        const events = [];
+        const renderer = new FrameRenderer(doc, new CandidateReads(noop, noop, noop),
+            (event, fields) => events.push({ event, ...fields }), noop);
+        renderer.apply({ ...input, enabled: false });
+        assert.equal(doc.inserted, undefined);
+        assert.deepEqual(events, []);
+
+        renderer.apply({ ...input, appearance: { ...input.appearance, mode } });
+        const expected = mode === "palette" ? palette : adaptive;
+        assert.ok(doc.inserted);
+        assert.deepEqual(events, [
+            { event: "marker-inserted", revision: 1, fixVersion: 1 },
+            { event: "marker-root-style", revision: 1, result,
+                beforeColor: before.color ?? null, beforeBackground: before.backgroundColor ?? null,
+                expectedColor: expected.color, expectedBackground: expected.backgroundColor,
+                afterColor: after.color ?? null, afterBackground: after.backgroundColor ?? null },
+        ]);
+        assert.ok(doc.inserted.textContent.includes(`background-color: ${expected.backgroundColor} !important`));
+        assert.ok(doc.inserted.textContent.includes(`color: ${expected.color} !important`));
+
+        renderer.apply({ ...input, enabled: false });
+        assert.equal(doc.inserted, undefined);
+        assert.equal(doc.defaultView.getComputedStyle(doc.documentElement).color, before.color);
+        assert.equal(events.length, 2);
+    });
+}
+
+test("an unavailable style read still reports insertion and leaves teardown available", () => {
+    const doc = markerDocument(website, adaptive);
+    doc.defaultView.getComputedStyle = () => { throw new Error("style unavailable"); };
+    const events = [];
+    const renderer = new FrameRenderer(doc, new CandidateReads(noop, noop, noop),
+        (event, fields) => events.push({ event, ...fields }), noop);
+    renderer.apply(input);
+    assert.ok(doc.inserted);
+    assert.equal(events[0].event, "marker-inserted");
+    assert.equal(events[1].result, "unavailable");
+    assert.equal(events[1].afterColor, null);
+    renderer.disable();
+    assert.equal(doc.inserted, undefined);
+});
+
 test("a failed candidate enable tears down partial output; eligible revisions use the public fix argument", async () => {
     const events = [];
     let hook;

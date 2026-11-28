@@ -5,6 +5,7 @@ import { createServer, request } from "node:http";
 import { setImmediate } from "node:timers/promises";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
 import { DEFAULT_ORIGINS, parseOrigins, RESOURCE_PATHS } from "../fixtures/origins.mjs";
 import { createFixtureHandler } from "../fixtures/server.mjs";
 
@@ -122,6 +123,64 @@ test("page and frame HTML select fixed hosts, strict CSP, CSS-only modes and a W
   assert.equal(clean.headers["referrer-policy"], "no-referrer");
   assert.equal(clean.headers["cache-control"], "no-store");
   assert.equal(clean.headers["set-cookie"], undefined);
+});
+
+test("ordinary and strict light fixtures report the same website control with the extension absent", () => {
+  const serve = createFixtureHandler();
+  function get(path) {
+    const headers = {};
+    let body;
+    serve({ headers: { host: new URL(DEFAULT_ORIGINS.top).host }, method: "GET", url: path }, {
+      setHeader: (name, value) => { headers[name] = value; },
+      writeHead: status => assert.equal(status, 200),
+      end: value => { body = value; },
+    });
+    return { headers, body };
+  }
+
+  const ordinary = get("/page.html?theme=light");
+  const strict = get("/page.html?theme=light&csp=strict");
+  assert.equal(strict.body, ordinary.body);
+  assert.equal(ordinary.headers["Content-Security-Policy"], undefined);
+  assert.match(strict.headers["Content-Security-Policy"], /style-src 'self'/);
+  assert.doesNotMatch(strict.headers["Content-Security-Policy"], /unsafe-inline/);
+  assert.match(get("/theme-a.css").body, /background-color: #fafafa; color: #182332;/);
+  const script = get("/page.js").body;
+
+  for (const [query, policy] of [["?theme=light", "ordinary"], ["?theme=light&csp=strict", "strict"]]) {
+    const site = { color: "rgb(24, 35, 50)", backgroundColor: "rgb(250, 250, 250)" };
+    const rootStyle = { ...site, colorScheme: "light" };
+    const rule = { selectorText: ":root", style: site };
+    const root = { classList: { contains: () => false }, hasAttribute: () => false };
+    const result = {};
+    const nodes = { "sheet-a": { media: "all", sheet: { cssRules: [rule] } }, "sheet-b": { media: "not all" }, result };
+    const document = {
+      documentElement: root, readyState: "loading",
+      getElementById: id => nodes[id] ?? {}, querySelector: () => ({ content: "#f5eedc" }),
+    };
+    const events = new EventTarget();
+    runInNewContext(script, {
+      document, location: { search: query }, URLSearchParams, performance,
+      addEventListener: events.addEventListener.bind(events),
+      getComputedStyle: node => node === root ? rootStyle : {},
+      matchMedia: media => ({ matches: media === "all", addEventListener() {} }),
+      requestAnimationFrame() {},
+    });
+    events.dispatchEvent(new Event("DOMContentLoaded"));
+    const latest = () => JSON.parse(result.textContent).at(-1);
+    assert.equal(latest().policyRequest, policy);
+    assert.deepEqual(latest().root, { scheme: "light", color: site.color, background: site.backgroundColor });
+    assert.deepEqual(latest().themeRule, { color: site.color, background: site.backgroundColor, matchesRoot: true });
+
+    Object.assign(rootStyle, { color: "rgb(224, 244, 255)", backgroundColor: "rgb(24, 26, 27)" });
+    events.dispatchEvent(new Event("pageshow"));
+    assert.deepEqual(latest().themeRule, { color: site.color, background: site.backgroundColor, matchesRoot: false });
+    assert.equal(latest().root.color, "rgb(224, 244, 255)");
+
+    nodes["sheet-a"].sheet = null;
+    events.dispatchEvent(new Event("pageshow"));
+    assert.equal(latest().themeRule, null);
+  }
 });
 
 test("CORS, local guard and original stylesheet controls share a distinctive rule", async t => {

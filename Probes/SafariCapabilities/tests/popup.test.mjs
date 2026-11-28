@@ -43,10 +43,11 @@ async function openPopup(t) {
     }
     const sent = [];
     let receive;
+    let disconnect;
     const port = {
         postMessage: message => sent.push(structuredClone(message)),
         onMessage: { addListener: handler => { receive = handler; } },
-        onDisconnect: { addListener() {} },
+        onDisconnect: { addListener: handler => { disconnect = handler; } },
     };
     const control = id => controls.get(id);
     const globals = {
@@ -68,7 +69,7 @@ async function openPopup(t) {
     };
     expectAction("refresh");
     return {
-        control, expectAction, sent,
+        control, expectAction, sent, disconnect, receive,
         publish: changes => receive(structuredClone({ ...state, ...changes })),
         click(id) { if (!control(id).disabled) control(id).dispatchEvent(new Event("click")); },
         choose(id, value) {
@@ -85,7 +86,7 @@ async function openPopup(t) {
     };
 }
 
-test("switching experiment panels preserves the draft and exports the displayed snapshot", async t => {
+test("switching panels preserves the draft and exports only fixture evidence", async t => {
     const ui = await openPopup(t);
     ui.click("show-appearance");
     ui.choose("theme", "ocean");
@@ -99,15 +100,32 @@ test("switching experiment panels preserves the draft and exports the displayed 
     }
     ui.click("show-appearance");
     assert.equal(ui.control("theme").value, "ocean");
-    ui.publish({});
+    const observation = {event:"marker-root-style", result:"applied", sequence:1, document:777,
+        beforeColor:"rgb(24, 35, 50)", url:"https://private.invalid/", id:"private-id"};
+    ui.publish({observations:[observation], instance:"private-instance"});
     ui.click("show-observations");
     const prefix = "data:application/json;charset=utf-8,";
     const exported = ui.control("export").href;
     assert.ok(exported.startsWith(prefix));
-    assert.equal(decodeURIComponent(exported.slice(prefix.length)), ui.control("observations").textContent);
-    assert.deepEqual(JSON.parse(ui.control("observations").textContent), state);
+    const evidence = JSON.parse(decodeURIComponent(exported.slice(prefix.length)));
+    assert.deepEqual(evidence.observations, [{event:"marker-root-style", result:"applied", sequence:1, beforeColor:"rgb(24, 35, 50)"}]);
+    assert.equal(evidence.instance, undefined);
+    assert.deepEqual(JSON.parse(ui.control("observations").textContent).observations, [observation]);
     ui.publish({private: true});
     assert.equal(ui.control("export").hidden, true);
+    assert.equal(ui.control("export").href, undefined);
+    ui.publish({});
+    assert.equal(ui.control("export").hidden, false);
+    ui.receive({type:"error", reason:"open-editor-on-fixture"});
+    assert.equal(ui.control("export").href, undefined);
+    ui.publish({});
+    ui.receive(null);
+    assert.equal(ui.control("export").href, undefined);
+    ui.publish({});
+    ui.publish({private: undefined});
+    assert.equal(ui.control("export").href, undefined);
+    ui.publish({});
+    ui.disconnect();
     assert.equal(ui.control("export").href, undefined);
     assert.deepEqual(ui.sent, []);
 });

@@ -2,6 +2,8 @@
 
 The marker adds one removable style to a controlled page. The candidate configuration runs the audited Dark Reader bundle against the same fixture. Use the [capability matrix](../../docs/plans/safari-capability-matrix.md) for procedures, controls and expected outcomes.
 
+For the next bounded Mac run, follow the [loading and marker controls](mac-loading-controls.md). They cover independent installations, the historical profile activation, three messaging phases and the matched strict-CSP comparison.
+
 ## 1. Build
 
 Use Node 24 or later, npm, Python 3, and Xcode with macOS and iOS Simulator SDKs. From this directory run:

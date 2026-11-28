@@ -55,7 +55,11 @@ For the top role, the first Deny sample has `observed: false` and `qualified: fa
 | MV3, candidate-repeat | Ordinary light | 69 | 70 |
 | MV3, candidate-repeat | Strict-CSP light | 49 | 50 |
 
-The browser record pins the exact unpacked files used on the Mac. The later popup edit used native control groups and hid the snapshot export until regular-profile state arrived. That edit has deterministic and build coverage. The background script, content script, manifests and audited library match the browser run byte for byte.
+The browser record pins the exact unpacked files used on the Mac. At `61d6a04` the markup and popup export guard had changed, while the manifest, background, content and audited library still matched the run. The subsequent loader and race corrections have separate package receipts.
+
+MV2 ordinary marker samples 53–54 and 88–89 recorded swatch foreground `rgb(224, 244, 255)`. The strict marker sample at 66–67 retained the original light-page foreground `rgb(24, 35, 50)`. Swatch backgrounds were transparent. The old marker event recorded insertion. Those captures lack a matched strict extension-off root sample and a before/after root color pair. They establish neither that the strict marker CSS applied nor which restriction caused the difference. The variants also shared a temporary installation slot. Use the [matched controls and independent-install procedure](../../Probes/SafariCapabilities/mac-loading-controls.md) before attributing a difference to CSP or manifest version.
+
+The corrected probe measures the two authorization races in deterministic tests. The offline manifest comparison reached public enable and disable and measured all three messaging phases with the audited UMD. The corresponding shipping Safari results for the new packages are `NOT_RUN`. The instrumented loader, paired marker controls and scoped fixture exports are available for subsequent work once their platform controls pass.
 
 ## 3. Preliminary OS boundaries
 

@@ -8,7 +8,7 @@ test("an unresolved site sheet delays capture and a failed packaged import leave
     const port = {
         postMessage(message) {
             sent.push(message);
-            if (message.event === "candidate-import-failed") failure.resolve();
+            if (message.event === "candidate-load-stage" && message.fields.asset === "candidate" && message.fields.result === "rejected") failure.resolve();
         },
         onMessage: { addListener: handler => { deliver = handler; } }, onDisconnect: { addListener() {} },
     };
@@ -31,7 +31,7 @@ test("an unresolved site sheet delays capture and a failed packaged import leave
         }
     });
     await import("../extension/content.ts");
-    const decision = { type: "decision", revision: 1, enabled: true, privileged: true, fix: true, renderer: "candidate",
+    const decision = { type: "decision", revision: 1, inputRevision: 1, enabled: true, privileged: true, fix: true, renderer: "candidate",
         appearance: { mode: "adaptive", theme: "graphite", brightness: 100, linkColor: "#123456" } };
     deliver(decision);
     doc.readyState = "interactive";
@@ -43,6 +43,6 @@ test("an unresolved site sheet delays capture and a failed packaged import leave
     deliver(decision);
     await failure.promise;
     assert.ok(sent.some(row => row.event === "ordinary-message" && row.fields.returned === "unavailable"));
-    assert.ok(sent.some(row => row.event === "candidate-import-failed"));
+    assert.ok(sent.some(row => row.event === "candidate-load-stage" && row.fields.stage === "evaluation" && row.fields.result === "unobserved"));
     assert.equal(sent.some(row => row.event === "candidate-enabled" || row.type === "read"), false);
 });
