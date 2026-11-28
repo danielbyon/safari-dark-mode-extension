@@ -1,0 +1,17 @@
+Required Notice: Copyright (c) 2026 Daniel Byon
+
+Unless a file or component is expressly licensed otherwise, new original
+project material owned by Daniel Byon and first provided under this notice
+is licensed under the PolyForm Noncommercial License 1.0.0 in LICENSE.
+
+The project was previously distributed under the MIT License, including
+the baseline at commit abb389a93a2b73f76030072328f448a7cd7d5065.
+This change does not revoke or restrict permissions previously granted
+for MIT-licensed material. The original MIT notice is preserved in
+docs/legal/legacy-mit-notice.txt.
+
+Third-party material remains subject to its respective license terms.
+The public source license is distinct from the terms under which the
+owner distributes the commercial App Store product. This notice does not
+add restrictions to the standard PolyForm license or limit rights
+provided by applicable law or GitHub's Terms of Service.
