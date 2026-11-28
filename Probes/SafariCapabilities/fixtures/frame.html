@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="theme-color" content="#f5eedc">
+  <title>Station frame</title>
+  <script src="/page.js"></script>
+  <link rel="stylesheet" href="/site.css">
+  <link rel="stylesheet" href="/theme-a.css" id="sheet-a" media="{{lightMedia}}">
+  <link rel="stylesheet" href="/theme-b.css" id="sheet-b" media="{{darkMedia}}">
+  <!-- resource-link -->
+</head>
+<body>
+  <h2 class="hero">Station frame</h2><p id="resource-swatch">Frame reading</p>
+  <button type="button" id="fixture-essential-control">Confirm frame check</button><output id="confirmations">0</output>
+  <label>Sample input <input id="sample-input" autocomplete="off"></label>
+  <select id="action" aria-label="Frame action">
+    <option value="check">Record current appearance</option><option value="sample">Fill and focus</option>
+    <option value="light">Select light</option><option value="dark">Select dark</option>
+    <option value="cssom">Change the active root rule</option>
+    <option value="resource">Check ordinary fetch and CSSOM</option>
+    <option value="reload">Reload frame</option>
+  </select>
+  <button type="button" id="run">Run frame action</button>
+  <a id="cross-link" href="{{crossOrigin}}/frame.html">Navigate this frame to the other host</a>
+  <!-- frames -->
+  <pre id="result" aria-live="polite"></pre>
+</body>
+</html>

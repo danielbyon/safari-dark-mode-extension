@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5eedc">
+  <title>Safari capability fixture</title>
+  <script src="/page.js"></script>
+  <link rel="stylesheet" href="/site.css">
+  <link rel="stylesheet" href="/theme-a.css" id="sheet-a" media="{{lightMedia}}">
+  <link rel="stylesheet" href="/theme-b.css" id="sheet-b" media="{{darkMedia}}">
+  <!-- resource-link -->
+</head>
+<body>
+  <header class="hero"><h1>Harbor weather station</h1><p>A dark header on the station bulletin.</p></header>
+  <main>
+    <p id="resource-swatch">The resource stylesheet adds a gold background and a green edge.</p>
+    <p id="deliberate-low-contrast">Low-contrast reference</p>
+    <button type="button" id="fixture-essential-control">Confirm station check</button>
+    <output id="confirmations">0</output>
+    <label>Sample input <input id="sample-input" autocomplete="off" spellcheck="false"></label>
+    <p><a id="anchor-link" href="#observations">Go to observations</a></p>
+    <fieldset><legend>Website actions</legend>
+      <label>Action <select id="action">
+        <option value="sample">Fill and focus the sample input</option>
+        <option value="check">Record current appearance</option>
+        <option value="focus-control">Focus the confirmation button</option>
+        <option value="light">Select the light sheet</option><option value="dark">Select the dark sheet</option>
+        <option value="cssom">Change the active root rule through CSSOM</option>
+        <option value="reevaluate">Insert an unrelated page node</option>
+        <option value="wp-on">Activate WP Dark Mode</option><option value="wp-off">Deactivate WP Dark Mode</option>
+        <option value="mutation">Run the dynamic mutation batch</option>
+        <option value="gated-mutation">Wait for release, then mutate</option>
+        <option value="resource">Check ordinary page fetch and CSSOM</option>
+        <option value="push">Push a path</option><option value="replace">Replace the path</option>
+        <option value="same-url">Push history state at the current URL</option>
+        <option value="query">Change the query</option><option value="fragment">Change the fragment</option>
+        <option value="anchor">Follow the page anchor</option><option value="back">Back</option><option value="forward">Forward</option>
+        <option value="new-document">Load another same-host document</option>
+        <option value="cross-host">Navigate to the other fixture host</option><option value="reload">Reload</option>
+      </select></label>
+      <button type="button" id="run">Run action</button>
+      <button type="button" id="queue">Run in 5 seconds</button>
+      <a id="cross-link" href="{{crossOrigin}}/page.html">Other fixture host</a>
+    </fieldset>
+    <section id="dynamic"><h2>Station readings</h2><p class="dynamic-sample">Air temperature</p>
+      <svg width="70" height="32" aria-label="Water levels" role="img" viewBox="0 0 70 32">
+        <path id="series" fill="#e6bf57" stroke="#174579" d="M2 30 L20 5 L40 20 L68 2 L68 30 Z"/>
+      </svg>
+      <div id="shadow-host"></div>
+    </section>
+    <!-- frames -->
+    <section id="observations"><h2>Website observations</h2>
+      <p>Use “Run in 5 seconds” to open the extension popup before a navigation or mutation. Records last for this document only.</p>
+      <pre id="result" aria-live="polite"></pre>
+    </section>
+  </main>
+</body>
+</html>

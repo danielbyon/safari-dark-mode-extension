@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Safari capability probe</title>
+<style>
+:root { color-scheme: light dark; font: 14px system-ui; }
+body { min-width: 19rem; max-width: 28rem; margin: .8rem; }
+fieldset, details { margin: .6rem 0; padding: .5rem; }
+label { display: block; margin: .4rem 0; }
+button { margin: .15rem; }
+pre { max-height: 12rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+</style>
+<h1>Safari capability probe</h1>
+<p id="status" role="status">Connecting to the extension…</p>
+<fieldset><legend>Rendering</legend>
+<label>Renderer <select id="renderer"><option value="marker">Reversible marker</option><option value="candidate">Dark Reader</option></select></label>
+<label>Synthetic access <select id="access"><option value="valid">Valid</option><option value="inactive">Inactive</option><option value="unknown">Unknown</option><option value="refreshing-unknown">Refreshing without valid access</option><option value="refreshing-valid">Refreshing with prior valid access</option></select></label>
+<label>Saved activation <select id="activation"><option value="on">Always On</option><option value="off">Always Off</option><option value="system">Follow System</option><option value="schedule">Schedule</option></select></label>
+<button type="button" id="save-activation">Set activation at editing scope</button>
+<label><input type="checkbox" id="use-theme"> Use My Theme on a native-dark website</label>
+<button type="button" id="save-policy">Set native-dark policy at editing scope</button>
+<label><input type="checkbox" id="pause"> Pause Everywhere</label>
+<button type="button" id="tab-on">Tab On</button><button type="button" id="tab-off">Tab Off</button><button type="button" id="tab-restore">Restore tab</button>
+</fieldset>
+<fieldset><legend>Appearance preview</legend>
+<label>Editing scope <select id="scope"><option value="global">Global default</option><option value="domain">Fixture domain</option><option value="host">Hostname</option><option value="section">Section</option><option value="page">Page path</option></select></label>
+<label>Theme <select id="theme"><option value="keep">Keep saved</option><option value="graphite">Adaptive Graphite</option><option value="ocean">Ocean palette</option><option value="inherit">Use Default</option></select></label>
+<label>Link color override <select id="color"><option value="keep">Keep saved</option><option value="inherit">Use Default</option><option value="#ddaa55">Amber</option><option value="#77cc88">Green</option></select></label>
+<button type="button" id="preview">Preview</button><button type="button" id="discard">Discard</button>
+<button type="button" id="seed">Save synthetic appearance at scope</button>
+</fieldset>
+<details><summary>Schedule</summary>
+<fieldset id="days"><legend>Start days</legend></fieldset>
+<label>From <select id="start"></select></label><label>Until <select id="end"></select></label>
+<button type="button" id="apply-schedule">Apply schedule</button></details>
+<details><summary>Website permissions</summary>
+<label>Host role <select id="role"><option>top</option><option>frame</option><option>resource</option><option>denied</option></select></label>
+<label>Current Safari setting <select id="setting"><option value="allow">Allow</option><option value="ask">Ask</option><option value="deny">Deny</option></select></label>
+<button type="button" id="calibrate">Compare with Safari grant</button>
+</details>
+<details><summary>Sanitized observations</summary>
+<button type="button" id="refresh">Refresh observations</button>
+<output id="observations" style="display:block;white-space:pre-wrap;overflow-wrap:anywhere"></output>
+</details>
+<script src="popup.js"></script>
+</html>

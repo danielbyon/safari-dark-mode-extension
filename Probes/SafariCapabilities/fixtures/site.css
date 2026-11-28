@@ -1,0 +1,12 @@
+body { max-width: 56rem; margin: 2rem auto; padding: 0 1rem; font: 1rem/1.45 system-ui, sans-serif; }
+.hero { padding: 1rem; background: #172334; color: #fafafa; }
+fieldset { margin-block: 1rem; }
+button, input, select { font: inherit; }
+button:focus-visible, input:focus-visible { outline: 3px solid #b74800; }
+#fixture-essential-control { color: #15334c; background: #f6d18b; border: 2px solid currentColor; }
+#deliberate-low-contrast { color: #858585; background: #8a8a8a; }
+#resource-swatch { display: block; padding: .4rem; }
+.dynamic-sample { color: var(--sample-color, #364c61); }
+iframe { width: 95%; min-height: 15rem; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+html.wp-dark-mode-active[data-wp-dark-mode-active] { background: #162332; color: #eee; color-scheme: dark; }
