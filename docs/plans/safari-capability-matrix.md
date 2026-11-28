@@ -8,7 +8,7 @@ These cases measure the behaviors specified in the [feasibility plan](technical-
 
 | Environment | Current evidence | Scope |
 |---|---|---|
-| macOS 27.2.1, shipping Safari 27.2 | Observed extension-off light-page reference. Extension scenarios NOT_RUN. | [Development observation](../evidence/safari-capabilities/mac-fixture-reference/observations.jsonl). Safari required local authentication before loading an unsigned extension. |
+| macOS 27.2.1, shipping Safari 27.2 | MV2 and MV3 loaded in a disposable profile. Both calibrated the top grant, injected on reload, applied the marker and received an ordinary pre-import reply. Both reported a candidate import failure. | [Mac run and package digests](../evidence/safari-capabilities/mac-safari-27.2/observations.jsonl). The [earlier extension-off reference](../evidence/safari-capabilities/mac-fixture-reference/observations.jsonl) used a development fixture. |
 | iPhone Simulator Safari | NOT_RUN | Build evidence applies only to the wrapper. |
 | iPad Simulator Safari | NOT_RUN | Build evidence applies only to the wrapper. |
 | Physical iPhone Safari | NOT_RUN | No device, installation or provisioning authorization. |
@@ -40,6 +40,23 @@ Use a fresh authorized document for each positive control. Repeat with the exten
 | 17. Mac keyboard commands | Run tab toggle and pause/resume in Safari, a supported Dock app and with an unrelated app frontmost. Exercise an available binding, supported customization and a conflict. | Record actual dispatch, conflict feedback, app scope and rule preservation. |
 | 18. Add to Dock | On a supported Mac, enable the extension in a fixture Dock app, inspect its actual website grants and repeat injection, popup, appearance and restoration. | Record the web-app version/context separately. A tab result does not qualify a web app. |
 
+### Observed Mac controls
+
+1. Both manifests reported the top host denied while the control host remained granted. After Allow, both passed calibration. The resource role followed the top host across ports, so the loopback run could not isolate a resource-only grant. Fresh top documents reported injection at `loading`. Injection into an existing document also occurred at `complete`. First-paint ordering remains open.
+2. MV3 reported active, paused, active, preview and active at saved revision 2. Its marker sampled a 3 px outline on the fixture control. MV2 applied the marker, but one popup rejected preview and discard with `open-editor-on-fixture`. The MV2 preview result is inconclusive. After top-host revocation and reload, the fixture’s check button still advanced its counter. Immediate style removal on the live page remains unverified.
+3. On both manifests the ordinary and strict-CSP light documents recorded a promise, one receiver, an echoed reply and then `candidate-import-failed`. Neither reached the after-import message. Fresh native-dark documents produced the preservation decision. The captured failure does not distinguish module loading from UMD registration. The next candidate experiment needs to distinguish those two steps before testing rendering, resource reads or teardown. [Sanitized traces](../evidence/safari-capabilities/mac-safari-27.2/observations.jsonl)
+
+For the top role, the first Deny sample has `observed: false` and `qualified: false`. The API agreed with Deny. Qualification stayed false until the same instance also saw Allow. The subsequent sample has `observed: true` and `qualified: true` on both manifests. The fixture role named `denied` shares the allowed control host in this run.
+
+| Capture | Fixture | Pre-import echoed reply sequence | Import failure sequence |
+|---|---|---:|---:|
+| MV2, manifest-comparison | Ordinary light | 95 | 96 |
+| MV2, manifest-comparison | Strict-CSP light | 105 | 106 |
+| MV3, candidate-repeat | Ordinary light | 69 | 70 |
+| MV3, candidate-repeat | Strict-CSP light | 49 | 50 |
+
+The browser record pins the exact unpacked files used on the Mac. The later popup edit used native control groups and hid the snapshot export until regular-profile state arrived. That edit has deterministic and build coverage. The background script, content script, manifests and audited library match the browser run byte for byte.
+
 ## 3. Preliminary OS boundaries
 
 | Platform | Documented boundary for screening | Oldest observed working OS |
@@ -61,9 +78,9 @@ The [local run record](../evidence/safari-capabilities/local-validation/observat
 
 | Issue checkbox | Technical evidence | Product qualification |
 |---|---|---|
-| 1. Platform surface | Two packaged manifests on Mac and iOS Simulator. The audited bundle forwarded messages but dropped the caller's promise after import and disable in the deterministic harness. Grant calibration, frame checks and redirects have deterministic controls. | Safari extension execution, permitted/denied HTTPS grant pair, real suspension, Private Browsing and Dock behavior remain open. |
-| 2. Eligibility and preservation | Decision-table, native-dark, renderer and first-party cancellation tests passed. The library's messaging limitation is reproducible in Node. | Effective Safari grants, independent site transitions and actual candidate-owned asynchronous rendering remain unqualified. |
-| 3. Preview and restoration | Scope inheritance, latest saved behavior, boundary invalidation, stale responses, lost editor and tab isolation have passing deterministic cases. | Actual Safari event coverage, immediate restoration after revocation, and a user-tested recovery remain open. |
+| 1. Platform surface | Two packaged manifests on Mac and iOS Simulator. The audited bundle forwarded messages but dropped the caller's promise after import and disable in the deterministic harness. Grant calibration, frame checks and redirects have deterministic controls. | Mac injection and pre-import messaging were observed in both variants. Candidate loading failed on both. Independent HTTPS grants, natural suspension, Private Browsing and Dock behavior remain open. |
+| 2. Eligibility and preservation | Decision-table, native-dark, renderer and first-party cancellation tests passed. The library's messaging limitation is reproducible in Node. | The Mac top-host grant pair passed. Fresh dark pages triggered preservation. Same-document site transitions and candidate-owned asynchronous rendering remain unqualified. |
+| 3. Preview and restoration | Scope inheritance, latest saved behavior, boundary invalidation, stale responses, lost editor and tab isolation have passing deterministic cases. | MV3 entered and discarded a preview at the same saved revision. MV2 preview, the full navigation matrix and live restoration after revocation remain open. A denied reload preserved the fixture button on MV2. |
 | 4. Tab override, pause and commands | Tests exercise synthetic browser events, session identity, pause and editor commands. | Natural suspension, duplicated/restored tabs, restart persistence and shortcut conflicts need platform runs. |
 | 5. Scheduling | Evaluator tests cover start-day attribution, endpoint validation, DST, zone/clock changes and current-time recomputation. | Actual browser wakeup, clock propagation and native integration remain open. |
 | 6. Evidence and OS floors | The probe, runbook, evidence classes and candidate OS boundaries are available for source inspection. | A platform floor or engine choice requires later evidence. |

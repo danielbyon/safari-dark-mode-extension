@@ -16,6 +16,9 @@ async function openPopup(t) {
     }
     class Control extends EventTarget {
         options = [];
+        attributes = new Map();
+        setAttribute(name, value) { this.attributes.set(name, value); }
+        removeAttribute(name) { this.attributes.delete(name); delete this[name]; }
         value = "";
         checked = false;
         disabled = false;
@@ -81,6 +84,33 @@ async function openPopup(t) {
         },
     };
 }
+
+test("switching experiment panels preserves the draft and exports the displayed snapshot", async t => {
+    const ui = await openPopup(t);
+    ui.click("show-appearance");
+    ui.choose("theme", "ocean");
+    ui.click("show-permissions");
+    assert.equal(ui.control("appearance-panel").hidden, true);
+    assert.equal(ui.control("permissions-panel").hidden, false);
+    assert.equal(ui.control("show-permissions").attributes.get("aria-pressed"), "true");
+    for (const expected of ["deny", "allow", "ask"]) {
+        ui.click(`compare-${expected}`);
+        ui.expectAction("calibrate", { role: "top", expected });
+    }
+    ui.click("show-appearance");
+    assert.equal(ui.control("theme").value, "ocean");
+    ui.publish({});
+    ui.click("show-observations");
+    const prefix = "data:application/json;charset=utf-8,";
+    const exported = ui.control("export").href;
+    assert.ok(exported.startsWith(prefix));
+    assert.equal(decodeURIComponent(exported.slice(prefix.length)), ui.control("observations").textContent);
+    assert.deepEqual(JSON.parse(ui.control("observations").textContent), state);
+    ui.publish({private: true});
+    assert.equal(ui.control("export").hidden, true);
+    assert.equal(ui.control("export").href, undefined);
+    assert.deepEqual(ui.sent, []);
+});
 
 test("refresh restores the background schedule and keeps unsubmitted edits during observation updates", async t => {
     const ui = await openPopup(t);

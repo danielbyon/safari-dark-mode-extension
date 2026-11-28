@@ -12,6 +12,16 @@ const send = (action: string, value?: unknown) => port.postMessage({type: "actio
 const click = (id: string, action: () => void) => element(id).addEventListener("click", action);
 const scope = () => select("scope").value;
 
+const panels = ["permissions", "rendering", "appearance", "schedule", "observations"];
+for (const selected of panels) {
+    click(`show-${selected}`, () => {
+        for (const panel of panels) {
+            element(`${panel}-panel`).hidden = panel !== selected;
+            element(`show-${panel}`).setAttribute("aria-pressed", String(panel === selected));
+        }
+    });
+}
+
 for (const [index, name] of ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].entries()) {
     const label = document.createElement("label");
     const input = document.createElement("input");
@@ -69,7 +79,9 @@ click("seed", () => send("saved", appearance()));
 click("discard", () => { previewActive = false; send("discard"); });
 for (const mode of ["on","off","restore"]) click(`tab-${mode}`, () => send("override", mode));
 click("refresh", () => send("refresh"));
-click("calibrate", () => send("calibrate", {role: select("role").value, expected: select("setting").value}));
+for (const expected of ["allow", "deny", "ask"]) {
+    click(`compare-${expected}`, () => send("calibrate", {role: select("role").value, expected}));
+}
 let lastSchedule = "";
 click("apply-schedule", () => {
     const weekdays = [0,1,2,3,4,5,6].filter(day => checkbox(`day-${day}`).checked);
@@ -125,7 +137,12 @@ port.onMessage.addListener(message => {
         protectEndpoints();
     }
     element("status").textContent = `${message.decision?.reason ?? "Waiting for a fixture document"} · saved revision ${message.savedRevision}`;
-    element("observations").textContent = JSON.stringify(message, null, 2);
+    const snapshot = JSON.stringify(message, null, 2);
+    element("observations").textContent = snapshot;
+    const exportLink = element<HTMLAnchorElement>("export");
+    exportLink.hidden = message.private;
+    if (message.private) exportLink.removeAttribute("href");
+    else exportLink.href = `data:application/json;charset=utf-8,${encodeURIComponent(snapshot)}`;
 });
 port.onDisconnect.addListener(() => { element("status").textContent = "Background disconnected. Reopen the popup to reconnect."; });
 send("refresh");
